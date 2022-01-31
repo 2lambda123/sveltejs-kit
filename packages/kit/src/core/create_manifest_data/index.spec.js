@@ -40,6 +40,7 @@ test('creates routes', () => {
 
 	assert.equal(routes, [
 		{
+			id: '2',
 			type: 'page',
 			segments: [],
 			pattern: /^\/$/,
@@ -50,6 +51,7 @@ test('creates routes', () => {
 		},
 
 		{
+			id: '3',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'about' }],
 			pattern: /^\/about\/?$/,
@@ -68,6 +70,7 @@ test('creates routes', () => {
 		},
 
 		{
+			id: '4',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'blog' }],
 			pattern: /^\/blog\/?$/,
@@ -89,6 +92,7 @@ test('creates routes', () => {
 		},
 
 		{
+			id: '5',
 			type: 'page',
 			segments: [
 				{ rest: false, dynamic: false, content: 'blog' },
@@ -116,6 +120,7 @@ test('creates routes with layout', () => {
 
 	assert.equal(routes, [
 		{
+			id: '2',
 			type: 'page',
 			segments: [],
 			pattern: /^\/$/,
@@ -126,6 +131,7 @@ test('creates routes with layout', () => {
 		},
 
 		{
+			id: '4',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'foo' }],
 			pattern: /^\/foo\/?$/,
@@ -210,6 +216,7 @@ test('disallows rest parameters inside segments', () => {
 
 	assert.equal(routes, [
 		{
+			id: '2',
 			type: 'page',
 			segments: [
 				{
@@ -384,6 +391,7 @@ test('works with custom extensions', () => {
 
 	assert.equal(routes, [
 		{
+			id: '2',
 			type: 'page',
 			segments: [],
 			pattern: /^\/$/,
@@ -394,6 +402,7 @@ test('works with custom extensions', () => {
 		},
 
 		{
+			id: '3',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'about' }],
 			pattern: /^\/about\/?$/,
@@ -412,6 +421,7 @@ test('works with custom extensions', () => {
 		},
 
 		{
+			id: '4',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'blog' }],
 			pattern: /^\/blog\/?$/,
@@ -433,6 +443,7 @@ test('works with custom extensions', () => {
 		},
 
 		{
+			id: '5',
 			type: 'page',
 			segments: [
 				{ rest: false, dynamic: false, content: 'blog' },
@@ -469,6 +480,7 @@ test('includes nested error components', () => {
 
 	assert.equal(routes, [
 		{
+			id: '6',
 			type: 'page',
 			segments: [
 				{ rest: false, dynamic: false, content: 'foo' },
@@ -500,6 +512,7 @@ test('resets layout', () => {
 
 	assert.equal(routes, [
 		{
+			id: '2',
 			type: 'page',
 			segments: [],
 			pattern: /^\/$/,
@@ -509,6 +522,7 @@ test('resets layout', () => {
 			b: [error]
 		},
 		{
+			id: '4',
 			type: 'page',
 			segments: [{ rest: false, dynamic: false, content: 'foo' }],
 			pattern: /^\/foo\/?$/,
@@ -522,6 +536,7 @@ test('resets layout', () => {
 			b: [error]
 		},
 		{
+			id: '7',
 			type: 'page',
 			segments: [
 				{ rest: false, dynamic: false, content: 'foo' },
