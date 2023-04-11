@@ -115,6 +115,7 @@ export function create_client(app, target) {
 	let root;
 
 	// keeping track of the history index in order to prevent popstate navigation events if needed
+	// eslint-disable-next-line compat/compat -- if the browser doesn't support `history.state` then this will be just undefined
 	let current_history_index = history.state?.[INDEX_KEY];
 
 	if (!current_history_index) {
@@ -1457,7 +1458,10 @@ export function create_client(app, target) {
 		},
 
 		_start_router: () => {
-			history.scrollRestoration = 'manual';
+			// If the browser supports `history.scrollRestoration`
+			if (history.scrollRestoration) {
+				history.scrollRestoration = 'manual';
+			}
 
 			// Adopted from Nuxt.js
 			// Reset scrollRestoration to auto when leaving page, allowing page reload
@@ -1823,12 +1827,57 @@ async function load_data(url, invalid) {
 
 	return new Promise(async (resolve) => {
 		/**
+		 * Kinda support somehow legacy environments that don't support the Stream API.
+		 * @param {Response} response
+		 */
+		const sloppy_legacy_friendly_reader_decoder = (response) => {
+			if ('body' in response && typeof TextDecoder !== 'undefined') {
+				return {
+					reader: /** @type {ReadableStream<Uint8Array>} */ (res.body).getReader(),
+					decoder: /** @type {{decode: (value: BufferSource | string | undefined) => string}} */ (
+						new TextDecoder()
+					)
+				};
+			}
+			// otherwise, we're in a legacy environment that doesn't support `Response.body`, so we shall simulate it
+
+			/** @type {string[] | undefined} */
+			let text_lines = undefined;
+			let current_line = 0;
+
+			return {
+				reader: {
+					read: async () => {
+						if (text_lines === undefined) {
+							const text = await res.text();
+
+							// Split the string on \n or \r characters
+							text_lines = text.split(/\r?\n|\r|\n/g);
+						}
+
+						if (current_line >= text_lines.length) {
+							return { done: true, value: undefined };
+						} else {
+							return { done: false, value: text_lines[current_line++] };
+						}
+					}
+				},
+				decoder: {
+					/**
+					 *
+					 * @param {BufferSource | string | undefined} value
+					 */
+					decode: (value) => /** @type {string} */ (value)
+				}
+			};
+		};
+
+		/**
 		 * Map of deferred promises that will be resolved by a subsequent chunk of data
 		 * @type {Map<string, import('types').Deferred>}
 		 */
 		const deferreds = new Map();
-		const reader = /** @type {ReadableStream<Uint8Array>} */ (res.body).getReader();
-		const decoder = new TextDecoder();
+		const { reader, decoder } = sloppy_legacy_friendly_reader_decoder(res);
 
 		/**
 		 * @param {any} data

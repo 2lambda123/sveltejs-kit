@@ -174,6 +174,8 @@ function kit({ svelte_config }) {
 	/** @type {import('vite').ConfigEnv} */
 	let vite_config_env;
 
+	let output_count = 0;
+
 	/** @type {boolean} */
 	let is_build;
 
@@ -643,7 +645,7 @@ function kit({ svelte_config }) {
 		},
 
 		/**
-		 * Vite builds a single bundle. We need three bundles: client, server, and service worker.
+		 * Vite builds a single bundle(or two on legacy). We need three bundles: client, server, and service worker.
 		 * The user's package.json scripts will invoke the Vite CLI to execute the server build. We
 		 * then use this hook to kick off builds for the client and service worker.
 		 */
@@ -651,6 +653,13 @@ function kit({ svelte_config }) {
 			sequential: true,
 			async handler(_options) {
 				if (secondary_build_started) return; // only run this once
+
+				++output_count;
+				const config_output = vite_config.build.rollupOptions.output;
+				const config_output_length = Array.isArray(config_output) ? config_output.length : 1;
+				if (output_count < config_output_length) {
+					return; // Wait untill all output will be done building, since we need the manifest
+				}
 
 				const verbose = vite_config.logLevel === 'info';
 				const log = logger({ verbose });
@@ -700,38 +709,61 @@ function kit({ svelte_config }) {
 
 				secondary_build_started = true;
 
+				const getLastFlat = (/** @type {unknown} */ arrOrObj) =>
+					Array.isArray(arrOrObj) ? arrOrObj[arrOrObj.length - 1] : arrOrObj;
+
 				const { output } = /** @type {import('rollup').RollupOutput} */ (
-					await vite.build({
-						configFile: vite_config.configFile,
-						// CLI args
-						mode: vite_config_env.mode,
-						logLevel: vite_config.logLevel,
-						clearScreen: vite_config.clearScreen,
-						build: {
-							minify: initial_config.build?.minify,
-							assetsInlineLimit: vite_config.build.assetsInlineLimit,
-							sourcemap: vite_config.build.sourcemap
-						},
-						optimizeDeps: {
-							force: vite_config.optimizeDeps.force
-						}
-					})
+					getLastFlat(
+						await vite.build({
+							configFile: vite_config.configFile,
+							// CLI args
+							mode: vite_config_env.mode,
+							logLevel: vite_config.logLevel,
+							clearScreen: vite_config.clearScreen,
+							build: {
+								minify: initial_config.build?.minify,
+								assetsInlineLimit: vite_config.build.assetsInlineLimit,
+								sourcemap: vite_config.build.sourcemap
+							},
+							optimizeDeps: {
+								force: vite_config.optimizeDeps.force
+							}
+						})
+					)
 				);
 
 				/** @type {import('vite').Manifest} */
 				const client_manifest = JSON.parse(read(`${out}/client/${vite_config.build.manifest}`));
 
-				build_data.client = {
-					start: find_deps(
+				/**
+				 *
+				 * @param {string} entry
+				 */
+				const find_file_if_exist = (entry) =>
+					entry in client_manifest ? client_manifest[entry].file : null;
+
+				/**
+				 *
+				 * @param {string} dir
+				 * @param {string} entry_name
+				 * @returns {import('types').AssetDependenciesWithLegacy}
+				 */
+				const find_deps_with_optional_legacy = (dir, entry_name) => ({
+					...find_deps(
 						client_manifest,
-						posixify(path.relative('.', `${runtime_directory}/client/start.js`)),
+						posixify(path.relative('.', `${dir}/${entry_name}.js`)),
 						false
 					),
-					app: find_deps(
-						client_manifest,
-						posixify(path.relative('.', `${kit.outDir}/generated/client-optimized/app.js`)),
-						false
+					legacy_file: find_file_if_exist(
+						posixify(path.relative('.', `${dir}/${entry_name}-legacy.js`))
 					)
+				});
+
+				build_data.client = {
+					start: find_deps_with_optional_legacy(`${runtime_directory}/client`, 'start'),
+					app: find_deps_with_optional_legacy(`${kit.outDir}/generated/client-optimized`, 'app'),
+					legacy_polyfills_file: find_file_if_exist('vite/legacy-polyfills-legacy'),
+					modern_polyfills_file: find_file_if_exist('vite/legacy-polyfills')
 				};
 
 				const css = output.filter(

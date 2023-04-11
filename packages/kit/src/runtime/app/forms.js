@@ -108,7 +108,11 @@ export function enhance(form, submit = () => {}) {
 				},
 				cache: 'no-store',
 				body: data,
-				signal: controller.signal
+				signal: controller.signal,
+				// Althought the default value of `credentials` is 'same-origin', we must specify it explicitly,
+				//  since the default value of the (recomended) `whatwg-fetch` polyfill is different (sadly :-( )),
+				//  and equals to 'omit' instead.
+				credentials: 'same-origin'
 			});
 
 			result = deserialize(await response.text());

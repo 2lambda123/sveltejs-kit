@@ -119,14 +119,18 @@ export async function dev(vite, vite_config, svelte_config) {
 						file: `${runtime_base}/client/start.js`,
 						imports: [],
 						stylesheets: [],
-						fonts: []
+						fonts: [],
+						legacy_file: null // No legacy support in dev mode
 					},
 					app: {
 						file: `${svelte_config.kit.outDir}/generated/client/app.js`,
 						imports: [],
 						stylesheets: [],
-						fonts: []
-					}
+						fonts: [],
+						legacy_file: null
+					},
+					legacy_polyfills_file: null,
+					modern_polyfills_file: null
 				},
 				nodes: manifest_data.nodes.map((node, index) => {
 					return async () => {

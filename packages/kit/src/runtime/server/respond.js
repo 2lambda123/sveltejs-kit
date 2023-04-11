@@ -40,6 +40,25 @@ const default_preload = ({ type }) => type === 'js' || type === 'css';
 
 /**
  * @param {Request} request
+ * @param {string} origin
+ * */
+export function is_origin_match(request, origin) {
+	const req_origin = request.headers.get('origin');
+	if (req_origin !== null) {
+		return req_origin === origin;
+	}
+
+	// In some legacy browsers (such as IE/Edge<79 and Firefox<58), the origin header isn't sent on POST requests.
+	// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin#browser_compatibility
+	// Therefore, we accept the request also if the `referer` header has the same origin,
+	//  in the case that the `origin` header is null, since this is enough for CSRF protection.
+
+	const referer = request.headers.get('referer');
+	return referer && new URL(referer).origin === origin;
+}
+
+/**
+ * @param {Request} request
  * @param {import('types').SSROptions} options
  * @param {import('types').SSRManifest} manifest
  * @param {import('types').SSRState} state
@@ -56,7 +75,7 @@ export async function respond(request, options, manifest, state) {
 				request.method === 'PUT' ||
 				request.method === 'PATCH' ||
 				request.method === 'DELETE') &&
-			request.headers.get('origin') !== url.origin;
+			!is_origin_match(request, url.origin);
 
 		if (forbidden) {
 			const csrf_error = error(403, `Cross-site ${request.method} form submissions are forbidden`);

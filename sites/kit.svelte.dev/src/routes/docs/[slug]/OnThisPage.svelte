@@ -23,7 +23,9 @@
 	let positions = [];
 
 	onMount(async () => {
-		await document.fonts.ready;
+		if (document.fonts) {
+			await document.fonts.ready;
+		}
 
 		update();
 		highlight();
@@ -97,12 +99,12 @@
 
 <style>
 	.on-this-page {
-		display: var(--on-this-page-display);
+		display: var(--on-this-page-display, block);
 		position: fixed;
 		padding: 0 var(--sk-page-padding-side) 0 0;
 		width: min(280px, calc(var(--sidebar-width) - var(--sk-page-padding-side)));
 		top: calc(var(--sk-page-padding-top) + var(--sk-nav-height));
-		left: calc(100vw - (var(--sidebar-width)));
+		right: 0;
 	}
 
 	h2 {

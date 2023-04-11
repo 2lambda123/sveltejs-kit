@@ -286,6 +286,205 @@ export async function render_response({
 	}
 
 	if (page_config.csr) {
+		const detectModernBrowserVarName = '__KIT_is_modern_browser';
+
+		/** A startup script var name for the init function, used when the user wants legacy support. */
+		const startup_script_var_name = '__KIT_startup_script';
+
+		const init_script_id = '__KIT_legacy_init_id';
+
+		const modern_import_func_var_name = '__KIT_modern_import_func';
+
+		/**
+		 * Generate JS init code for the HTML entry page
+		 * @param {boolean} legacy_support_and_export_init
+		 * @returns {string}
+		 */
+		const generate_init_script = (legacy_support_and_export_init) => {
+			/** @type {string[]} */
+			const blocks = [];
+
+			/** @type {Record<string, string>} */
+			const pre_init_input = {};
+
+			/** @type {Record<string, string>} */
+			const init_input = {};
+
+			/**
+			 *
+			 * @param {string[]} codeBlocks
+			 * @param {Record<string, string>} input
+			 * @param {string} separator
+			 */
+			const render_code_with_input = (codeBlocks, input, separator = '\n\t\t\t\t\t') => {
+				const input_list = Object.entries(input);
+				if (input_list.length === 0) {
+					return codeBlocks.join(separator);
+				}
+				// otherwise
+
+				return legacy_support_and_export_init
+					? `(function (${input_list.map(([key]) => key).join(', ')}) {
+					${blocks.join(separator)}
+				})(${input_list.map(([, value]) => value).join(', ')});`
+					: `${[
+							...input_list.map(([key, val]) => `const ${key} = ${val};`),
+							'',
+							...codeBlocks
+					  ].join(separator)}`;
+			};
+
+			const import_func = legacy_support_and_export_init ? 'import_func' : 'import';
+			if (legacy_support_and_export_init) {
+				init_input.import_func = `window.${modern_import_func_var_name} || (function (id) { return System.import(id); })`;
+			}
+
+			const properties = [
+				`env: ${s(public_env)}`,
+				paths.assets && `assets: ${s(paths.assets)}`,
+				`base: ${base_expression}`,
+				`element: ${
+					legacy_support_and_export_init
+						? `document.getElementById(${s(init_script_id)})`
+						: 'document.currentScript'
+				}.parentNode`
+			].filter(Boolean);
+
+			if (chunks) {
+				pre_init_input['deferred'] = 'new Map()';
+
+				properties.push(`defer: function (id) { return new Promise(function (fulfil, reject) {
+							deferred.set(id, { fulfil: fulfil, reject: reject });
+						}) }`);
+
+				properties.push(`resolve: function (result) {
+							${render_code_with_input(
+								[
+									`deferred.delete(result.id);
+
+							if (result.error) deferred_result.reject(result.error);
+							else deferred_result.fulfil(result.data);
+							`
+								],
+								{ deferred_result: 'deferred.get(result.id)' },
+								'\n\t\t\t\t\t\t\t'
+							)}
+						}`);
+			}
+
+			const global_kit_prop_init = `${global} = {
+						${properties.join(',\n\t\t\t\t\t\t')}
+					};`;
+
+			const args = [`app`, `${global}.element`];
+
+			if (page_config.ssr) {
+				const serialized = { form: 'null', error: 'null' };
+
+				init_input['data'] = data;
+
+				if (form_value) {
+					serialized.form = uneval_action_response(
+						form_value,
+						/** @type {string} */ (event.route.id)
+					);
+				}
+
+				if (error) {
+					serialized.error = devalue.uneval(error);
+				}
+
+				const hydrate = [
+					`node_ids: [${branch.map(({ node }) => node.index).join(', ')}]`,
+					`data: data`,
+					`form: ${serialized.form}`,
+					`error: ${serialized.error}`
+				];
+
+				if (status !== 200) {
+					hydrate.push(`status: ${status}`);
+				}
+
+				if (options.embedded) {
+					hydrate.push(`params: ${devalue.uneval(event.params)}`, `route: ${s(event.route)}`);
+				}
+
+				args.push(`{\n\t\t\t\t\t\t\t${hydrate.join(',\n\t\t\t\t\t\t\t')}\n\t\t\t\t\t\t}`);
+			}
+
+			/**
+			 *
+			 * @param {import('types').AssetDependenciesWithLegacy[]} assets
+			 * @param {(asset: import('types').AssetDependenciesWithLegacy) => string} getPathFunc
+			 * @returns {string}
+			 */
+			const get_import_arr = (assets, getPathFunc) =>
+				`[\n\t\t\t\t\t\t${assets
+					.map((asset) => `${import_func}(${s(prefixed(getPathFunc(asset)))})`)
+					.join(',\n\t\t\t\t\t\t')}\n\t\t\t\t\t]`;
+
+			const assets = [client.start, client.app];
+			const modern_import_arr = get_import_arr(assets, (asset) => asset.file);
+			const get_legacy_import_arr = () =>
+				get_import_arr(assets, (asset) => /** @type {string} */ (asset.legacy_file));
+
+			const import_arr_combined = legacy_support_and_export_init
+				? `window.${detectModernBrowserVarName} ? ${modern_import_arr} : ${get_legacy_import_arr()}`
+				: modern_import_arr;
+
+			blocks.push(
+				legacy_support_and_export_init
+					? `Promise.all(${import_arr_combined}).then(function (modules) {
+						(function (kit, app) { kit.start(${args.join(', ')}) })(modules[0], modules[1]);
+					});`
+					: `Promise.all(${import_arr_combined}).then(([kit, app]) => {
+						kit.start(${args.join(', ')});
+					});`
+			);
+
+			if (options.service_worker) {
+				const opts = __SVELTEKIT_DEV__ ? `, { type: 'module' }` : '';
+
+				// we use an anonymous function instead of an arrow function to support
+				// older browsers (https://github.com/sveltejs/kit/pull/5417)
+				blocks.push(`if ('serviceWorker' in navigator) {
+						addEventListener('load', function () {
+							navigator.serviceWorker.register('${prefixed('service-worker.js')}'${opts});
+						});
+					}`);
+			}
+
+			const setup_code = [
+				render_code_with_input([global_kit_prop_init], pre_init_input),
+				render_code_with_input(blocks, init_input)
+			].join('\n\n\t\t\t\t\t');
+
+			return legacy_support_and_export_init
+				? `
+				window.${startup_script_var_name} = function () {
+					${setup_code}
+				};
+			`
+				: `
+				{
+					${setup_code}
+				}
+			`;
+		};
+
+		// Injecting (potentially) legacy script together with the modern script -
+		//  in a similar fashion to the script tags injection of @vitejs/plugin-legacy.
+		// Notice that unlike the script injection on @vitejs/plugin-legacy,
+		//  we don't need to have a constant CSP since kit handles it.
+
+		if (client.modern_polyfills_file) {
+			const path = prefixed(client.modern_polyfills_file);
+			link_header_preloads.add(
+				`<${encodeURI(path)}>; rel="modulepreload"; crossorigin="anonymous"; nopush`
+			);
+			head += `\n\t\t<script type="module" crossorigin="anonymous" src=${s(path)}></script>`;
+		}
+
 		const included_modulepreloads = Array.from(modulepreloads, (dep) => prefixed(dep)).filter(
 			(path) => resolve_opts.preload({ type: 'js', path })
 		);
@@ -300,100 +499,95 @@ export async function render_response({
 			}
 		}
 
-		const blocks = [];
+		/**
+		 *
+		 * @param {string} script
+		 * @param {string | undefined} additionalAttrs
+		 */
+		function add_traditional_script(script, additionalAttrs = undefined) {
+			body +=
+				`\n\t\t\t<script` +
+				(additionalAttrs ? ` ${additionalAttrs}` : '') +
+				(script && csp.script_needs_nonce ? ` nonce="${csp.nonce}"` : '') +
+				`>${script}</script>`;
 
-		const properties = [
-			`env: ${s(public_env)}`,
-			paths.assets && `assets: ${s(paths.assets)}`,
-			`base: ${base_expression}`,
-			`element: document.currentScript.parentElement`
-		].filter(Boolean);
-
-		if (chunks) {
-			blocks.push(`const deferred = new Map();`);
-
-			properties.push(`defer: (id) => new Promise((fulfil, reject) => {
-							deferred.set(id, { fulfil, reject });
-						})`);
-
-			properties.push(`resolve: ({ id, data, error }) => {
-							const { fulfil, reject } = deferred.get(id);
-							deferred.delete(id);
-
-							if (error) reject(error);
-							else fulfil(data);
-						}`);
+			if (script) {
+				csp.add_script(script);
+			}
 		}
 
-		blocks.push(`${global} = {
-						${properties.join(',\n\t\t\t\t\t\t')}
-					};`);
+		/**
+		 *
+		 * @param {string} script
+		 * @param {string | undefined} additionalAttrs
+		 */
+		const add_nomodule_script_unsafe = (script, additionalAttrs = undefined) =>
+			add_traditional_script(script, `nomodule${additionalAttrs ? ` ${additionalAttrs}` : ''}`);
 
-		const args = [`app`, `${global}.element`];
-
-		if (page_config.ssr) {
-			const serialized = { form: 'null', error: 'null' };
-
-			blocks.push(`const data = ${data};`);
-
-			if (form_value) {
-				serialized.form = uneval_action_response(
-					form_value,
-					/** @type {string} */ (event.route.id)
-				);
+		let had_emitted_nomodule_fix = false;
+		function emit_nomodule_fix_if_needed() {
+			if (had_emitted_nomodule_fix) {
+				return;
 			}
+			// otherwise
 
-			if (error) {
-				serialized.error = devalue.uneval(error);
-			}
+			had_emitted_nomodule_fix = true;
 
-			const hydrate = [
-				`node_ids: [${branch.map(({ node }) => node.index).join(', ')}]`,
-				`data`,
-				`form: ${serialized.form}`,
-				`error: ${serialized.error}`
-			];
-
-			if (status !== 200) {
-				hydrate.push(`status: ${status}`);
-			}
-
-			if (options.embedded) {
-				hydrate.push(`params: ${devalue.uneval(event.params)}`, `route: ${s(event.route)}`);
-			}
-
-			args.push(`{\n\t\t\t\t\t\t\t${hydrate.join(',\n\t\t\t\t\t\t\t')}\n\t\t\t\t\t\t}`);
+			// Before adding nomodule scripts, we need to inject Safari 10 nomodule fix
+			// https://gist.github.com/samthor/64b114e4a4f539915a95b91ffd340acc
+			// DO NOT ALTER THIS CONTENT
+			const safari10NoModuleFix = `!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();`;
+			add_nomodule_script_unsafe(safari10NoModuleFix);
 		}
 
-		blocks.push(`Promise.all([
-						import(${s(prefixed(client.start.file))}),
-						import(${s(prefixed(client.app.file))})
-					]).then(([kit, app]) => {
-						kit.start(${args.join(', ')});
-					});`);
-
-		if (options.service_worker) {
-			const opts = __SVELTEKIT_DEV__ ? `, { type: 'module' }` : '';
-
-			// we use an anonymous function instead of an arrow function to support
-			// older browsers (https://github.com/sveltejs/kit/pull/5417)
-			blocks.push(`if ('serviceWorker' in navigator) {
-						addEventListener('load', function () {
-							navigator.serviceWorker.register('${prefixed('service-worker.js')}'${opts});
-						});
-					}`);
+		/**
+		 *
+		 * @param {string} script
+		 * @param {string | undefined} additionalAttrs
+		 */
+		function add_nomodule_script(script, additionalAttrs = undefined) {
+			emit_nomodule_fix_if_needed();
+			add_nomodule_script_unsafe(script, additionalAttrs);
 		}
 
-		const init_app = `
-				{
-					${blocks.join('\n\n\t\t\t\t\t')}
-				}
-			`;
-		csp.add_script(init_app);
+		if (client.legacy_polyfills_file) {
+			add_nomodule_script('', `src=${s(prefixed(client.legacy_polyfills_file))}`);
+		}
 
-		body += `\n\t\t\t<script${
-			csp.script_needs_nonce ? ` nonce="${csp.nonce}"` : ''
-		}>${init_app}</script>\n\t\t`;
+		if (client.start.legacy_file && client.app.legacy_file) {
+			// Have legacy support
+
+			const detectModernBrowserCode = `try{import.meta.url;import("_").catch(()=>1);}catch(e){}window.${detectModernBrowserVarName}=true;window.${modern_import_func_var_name}=(path)=>import(path);`;
+			head += `\n\t\t<script type="module"${
+				csp.script_needs_nonce ? ` nonce="${csp.nonce}"` : ''
+			}>${detectModernBrowserCode}</script>`;
+			csp.add_script(detectModernBrowserCode);
+
+			emit_nomodule_fix_if_needed();
+
+			add_traditional_script(generate_init_script(true), `id=${s(init_script_id)}`);
+
+			add_nomodule_script(`window.${startup_script_var_name}();`);
+
+			const dynamicInitOrFallbackInlineCode =
+				`!function(){if(window.${detectModernBrowserVarName}){window.${startup_script_var_name}();}else{console.warn("kit: loading legacy build because dynamic import or import.meta.url is unsupported, syntax error above should be ignored");` +
+				(client.legacy_polyfills_file
+					? `var n=document.createElement("script");n.src=${s(
+							prefixed(client.legacy_polyfills_file)
+					  )},n.onload=window.${startup_script_var_name},document.body.appendChild(n)`
+					: `window.${startup_script_var_name}()`) +
+				`}}();`;
+			body += `\n\t\t\t<script type="module"${
+				csp.script_needs_nonce ? ` nonce="${csp.nonce}"` : ''
+			}>${dynamicInitOrFallbackInlineCode}</script>`;
+			csp.add_script(dynamicInitOrFallbackInlineCode);
+		} else {
+			// No legacy support
+
+			add_traditional_script(generate_init_script(false));
+		}
+
+		body += '\n\t\t';
 	}
 
 	const headers = new Headers({

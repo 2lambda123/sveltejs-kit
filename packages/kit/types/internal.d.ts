@@ -49,14 +49,20 @@ export interface AssetDependencies {
 	fonts: string[];
 }
 
+export interface AssetDependenciesWithLegacy extends AssetDependencies {
+	legacy_file: string | null;
+}
+
 export interface BuildData {
 	app_dir: string;
 	app_path: string;
 	manifest_data: ManifestData;
 	service_worker: string | null;
 	client: {
-		start: AssetDependencies;
-		app: AssetDependencies;
+		start: AssetDependenciesWithLegacy;
+		app: AssetDependenciesWithLegacy;
+		legacy_polyfills_file: string | null;
+		modern_polyfills_file: string | null;
 	} | null;
 	server_manifest: import('vite').Manifest;
 }

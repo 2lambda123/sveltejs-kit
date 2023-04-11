@@ -1,4 +1,5 @@
 <script>
+	import '../extra-polyfills.js';
 	import { browser } from '$app/environment';
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
@@ -59,7 +60,7 @@
 	</div>
 </Shell>
 
-{#if browser}
+{#if browser && !import.meta.env.LEGACY && 'Worker' in window}
 	<SearchBox />
 {/if}
 

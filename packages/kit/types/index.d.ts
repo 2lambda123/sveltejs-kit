@@ -18,7 +18,12 @@ import {
 	RouteSegment,
 	UniqueInterface
 } from './private.js';
-import { AssetDependencies, SSRNodeLoader, SSRRoute, ValidatedConfig } from './internal.js';
+import {
+	AssetDependenciesWithLegacy,
+	SSRNodeLoader,
+	SSRRoute,
+	ValidatedConfig
+} from './internal.js';
 
 export { PrerenderOption } from './private.js';
 
@@ -1060,8 +1065,10 @@ export interface SSRManifest {
 	/** private fields */
 	_: {
 		client: {
-			start: AssetDependencies;
-			app: AssetDependencies;
+			start: AssetDependenciesWithLegacy;
+			app: AssetDependenciesWithLegacy;
+			legacy_polyfills_file: string | null;
+			modern_polyfills_file: string | null;
 		};
 		nodes: SSRNodeLoader[];
 		routes: SSRRoute[];
