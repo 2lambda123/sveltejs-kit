@@ -817,6 +817,14 @@ export interface NavigationTarget {
 	 * The URL that is navigated to
 	 */
 	url: URL;
+
+	/**
+	 * The scroll position of the target
+	 */
+	scroll: {
+		x: number;
+		y: number;
+	};
 }
 
 /**
