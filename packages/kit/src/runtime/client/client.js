@@ -1082,6 +1082,12 @@ export function create_client(app, target) {
 			}
 		}
 
+		// check if load cache overrides any search params
+		if (load_cache) {
+			const { search } = new URL(location.href);
+			if (search.length > 0) navigation_result.state.url.search = search;
+		}
+
 		// reset preload synchronously after the history state has been set to avoid race conditions
 		load_cache = null;
 
