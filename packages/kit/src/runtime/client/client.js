@@ -170,7 +170,7 @@ export function create_client(app, target) {
 
 		if (navigation_result) {
 			if (navigation_result.type === 'redirect') {
-				return goto(new URL(navigation_result.location, url).href, {}, [url.pathname], nav_token);
+				return goto(navigation_result.url, {}, [url.pathname], nav_token);
 			} else {
 				if (navigation_result.props.page !== undefined) {
 					page = navigation_result.props.page;
@@ -327,15 +327,6 @@ export function create_client(app, target) {
 		route,
 		form
 	}) {
-		/** @type {import('types').TrailingSlash} */
-		let slash = 'never';
-		for (const node of branch) {
-			if (node?.slash !== undefined) slash = node.slash;
-		}
-		url.pathname = normalize_path(url.pathname, slash);
-		// eslint-disable-next-line
-		url.search = url.search; // turn `/?` into `/`
-
 		/** @type {import('./types').NavigationFinished} */
 		const result = {
 			type: 'loaded',
@@ -551,8 +542,7 @@ export function create_client(app, target) {
 			loader,
 			server: server_data_node,
 			universal: node.universal?.load ? { type: 'data', data, uses } : null,
-			data: data ?? server_data_node?.data ?? null,
-			slash: node.universal?.trailingSlash ?? server_data_node?.slash
+			data: data ?? server_data_node?.data ?? null
 		};
 	}
 
@@ -649,7 +639,10 @@ export function create_client(app, target) {
 			}
 
 			if (server_data.type === 'redirect') {
-				return server_data;
+				return {
+					type: 'redirect',
+					url: new URL(server_data.location, url)
+				};
 			}
 		}
 
@@ -714,7 +707,7 @@ export function create_client(app, target) {
 					if (err instanceof Redirect) {
 						return {
 							type: 'redirect',
-							location: err.location
+							url: new URL(err.location, await normalize_url(url, route))
 						};
 					}
 
@@ -995,6 +988,7 @@ export function create_client(app, target) {
 
 		token = nav_token;
 		let navigation_result = intent && (await load_route(intent));
+		url = await normalize_url(url, intent?.route ?? null);
 
 		if (!navigation_result) {
 			if (is_external_url(url, base)) {
@@ -1012,10 +1006,6 @@ export function create_client(app, target) {
 			);
 		}
 
-		// if this is an internal navigation intent, use the normalized
-		// URL for the rest of the function
-		url = intent?.url || url;
-
 		// abort if user navigated during update
 		if (token !== nav_token) return false;
 
@@ -1032,12 +1022,7 @@ export function create_client(app, target) {
 					route: { id: null }
 				});
 			} else {
-				goto(
-					new URL(navigation_result.location, url).href,
-					{},
-					[...redirect_chain, url.pathname],
-					nav_token
-				);
+				goto(navigation_result.url, {}, [...redirect_chain, url.pathname], nav_token);
 				return false;
 			}
 		} else if (/** @type {number} */ (navigation_result.props.page?.status) >= 400) {
@@ -1056,14 +1041,6 @@ export function create_client(app, target) {
 
 		update_scroll_positions(previous_history_index);
 		capture_snapshot(previous_history_index);
-
-		// ensure the url pathname matches the page's trailing slash option
-		if (
-			navigation_result.props.page?.url &&
-			navigation_result.props.page.url.pathname !== url.pathname
-		) {
-			url.pathname = navigation_result.props.page?.url.pathname;
-		}
 
 		if (details) {
 			const change = details.replaceState ? 0 : 1;
@@ -1988,6 +1965,27 @@ function reset_focus() {
 			});
 		}
 	}
+}
+
+/**
+ * @param {URL} url
+ * @param {import('types').CSRRoute | null} route
+ * @returns {Promise<URL>}
+ */
+async function normalize_url(url, route) {
+	const normalized = new URL(url);
+	if (route) {
+		/** @type {import('types').TrailingSlash} */
+		let slash = 'never';
+		for (const loader of [...route.layouts, route.leaf]) {
+			// okay for this to be serial as module should have been preloaded by this point
+			const node = await loader?.[1]();
+			slash = node?.universal?.trailingSlash ?? slash;
+		}
+		normalized.pathname = normalize_path(url.pathname, slash);
+	}
+	normalized.search = url.search; // turn `/?` into `/`
+	return normalized;
 }
 
 if (DEV) {
