@@ -138,6 +138,13 @@ const options = object(
 				errorTemplate: string(join('src', 'error.html'))
 			}),
 
+			images: object({
+				loader: string(''),
+				widths: number_array([
+					48, 128, 256, 540, 768, 1080, 1366, 1536, 1920, 2560, 3000, 4096, 5120
+				])
+			}),
+
 			inlineStyleThreshold: number(0),
 
 			moduleExtensions: string_array(['.js', '.ts']),
@@ -348,6 +355,20 @@ function string(fallback, allow_empty = true) {
 
 		if (!allow_empty && input === '') {
 			throw new Error(`${keypath} cannot be empty`);
+		}
+
+		return input;
+	});
+}
+
+/**
+ * @param {number[] | undefined} [fallback]
+ * @returns {Validator}
+ */
+function number_array(fallback) {
+	return validate(fallback, (input, keypath) => {
+		if (!Array.isArray(input) || input.some((value) => typeof value !== 'number')) {
+			throw new Error(`${keypath} must be an array of numbers, if specified`);
 		}
 
 		return input;

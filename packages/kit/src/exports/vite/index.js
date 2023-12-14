@@ -441,6 +441,18 @@ function kit({ svelte_config }) {
 						}
 					`;
 				}
+
+				case '\0virtual:__sveltekit/images': {
+					const { images } = svelte_config.kit;
+					const loader = images.loader
+						? `export { default as loader } from '${images.loader}';`
+						: 'export function loader(src) { console.warn("No image loader in kit.config.kit.images.loader set, images will not be optimized."); return src; }';
+
+					return dedent`
+						export const widths = ${JSON.stringify(images.widths)};
+						${loader}
+					`;
+				}
 			}
 		}
 	};

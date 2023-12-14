@@ -106,3 +106,9 @@ declare module '__sveltekit/paths' {
 	export function override(paths: { base: string; assets: string }): void;
 	export function set_assets(path: string): void;
 }
+
+/** Internal version of $app/images */
+declare module '__sveltekit/images' {
+	export let widths: number[];
+	export let loader: (url: string, width: number, image_options?: Record<string, any>) => string;
+}

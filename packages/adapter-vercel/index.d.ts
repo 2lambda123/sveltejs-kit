@@ -1,7 +1,42 @@
 import { Adapter } from '@sveltejs/kit';
 import './ambient.js';
 
-export default function plugin(config?: Config): Adapter;
+export default function plugin(
+	config?: Config & {
+		/**
+		 * Enable or disable Vercel's image optimization. This is enabled by default if you have
+		 * defined the Vercel loader in `kit.images.loader`, else disabled by default.
+		 * https://vercel.com/docs/concepts/image-optimization
+		 */
+		images?: ImageConfig;
+	}
+): Adapter;
+
+/**
+ * Define how Vercel should optimize your images. Links to the documentation:
+ * - https://vercel.com/docs/concepts/image-optimization
+ * - https://vercel.com/docs/build-output-api/v3/configuration#images
+ */
+export interface ImageConfig {
+	/** Only set this if you're not using SvelteKit's `getImage` from `$app/images` */
+	sizes?: number[];
+	domains?: string[];
+	remotePatterns?: RemotePattern[];
+	minimumCacheTTL?: number;
+	formats?: ImageFormat[];
+	dangerouslyAllowSVG?: boolean;
+	contentSecurityPolicy?: string;
+	contentDispositionType?: string;
+}
+
+type ImageFormat = 'image/avif' | 'image/webp';
+
+type RemotePattern = {
+	protocol?: 'http' | 'https';
+	hostname: string;
+	port?: string;
+	pathname?: string;
+};
 
 export interface ServerlessConfig {
 	/**
