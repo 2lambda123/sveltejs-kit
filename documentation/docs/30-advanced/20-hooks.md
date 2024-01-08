@@ -133,9 +133,79 @@ export async function handleFetch({ event, request, fetch }) {
 }
 ```
 
+### handleServerLoad
+
+This function allows you to wrap server `load` functions with custom behavior. It is called whenever a server `load` function would be called. It receives the same `event` object the `load` function would get and a `resolve` method through which you can call the original load function.
+
+```js
+/** @type {import("@sveltejs/kit").HandleServerLoad} */
+export async function handleServerLoad({ event, resolve }) {
+	const { untrack, url, parent } = event;
+
+	if (untrack(() => url.pathname.endsWith('/bypass'))) {
+		// Do not call load function at all
+		return {
+			from: 'handleServerLoad'
+		};
+	} else if (untrack(() => url.pathname.endsWith('/enrich'))) {
+		// Call load function with modified inputs and adjust result
+		const result = await resolve({
+			...event,
+			parent: () => {
+				console.log('called parent');
+				return parent();
+			}
+		});
+		return {
+			from: 'handleServerLoad and ' + /** @type {any} */ (result).from
+		};
+	} else {
+		// Call load function directly
+		return resolve(event);
+	}
+}
+```
+
+Note how we're using `untrack` to avoid rerunning all load functions on any URL change because of accessing `url.pathname`.
+
 ## Shared hooks
 
 The following can be added to `src/hooks.server.js` _and_ `src/hooks.client.js`:
+
+### handleLoad
+
+This function allows you to wrap universal `load` functions with custom behavior. It is called whenever a universal `load` function would be called. It receives the same `event` object the `load` function would get and a `resolve` method through which you can call the original load function.
+
+```js
+/** @type {import("@sveltejs/kit").HandleLoad} */
+export async function handleLoad({ event, resolve }) {
+	const { untrack, url, parent } = event;
+
+	if (untrack(() => url.pathname.endsWith('/bypass'))) {
+		// Do not call load function at all
+		return {
+			from: 'handleLoad'
+		};
+	} else if (untrack(() => url.pathname.endsWith('/enrich'))) {
+		// Call load function with modified inputs and adjust result
+		const result = await resolve({
+			...event,
+			parent: () => {
+				console.log('called parent');
+				return parent();
+			}
+		});
+		return {
+			from: 'handleLoad and ' + /** @type {any} */ (result).from
+		};
+	} else {
+		// Call load function directly
+		return resolve(event);
+	}
+}
+```
+
+Note how we're using `untrack` to avoid rerunning all load functions on any URL change because of accessing `url.pathname`.
 
 ### handleError
 

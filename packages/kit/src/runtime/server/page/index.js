@@ -152,7 +152,8 @@ export async function render_page(event, page, options, manifest, state, resolve
 								if (parent) Object.assign(data, await parent.data);
 							}
 							return data;
-						}
+						},
+						handle_load: options.hooks.handleServerLoad
 					});
 				} catch (e) {
 					load_error = /** @type {Error} */ (e);
@@ -182,6 +183,7 @@ export async function render_page(event, page, options, manifest, state, resolve
 						resolve_opts,
 						server_data_promise: server_promises[i],
 						state,
+						handle_load: options.hooks.handleLoad,
 						csr
 					});
 				} catch (e) {
