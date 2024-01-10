@@ -9,6 +9,7 @@ on:
 env:
   # we call `pnpm playwright install` instead
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+  PW_DISABLE_TS_ESM: '1'
 
 # cancel in-progress runs on new commits to same PR (gitub.event.number)
 concurrency:
@@ -58,6 +59,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm playwright install ${{ matrix.e2e-browser }}
       - run: pnpm test
+
+      - name: Print flaky test report
+        run: node scripts/print-flaky-test-report.js
+
       - name: Archive test results
         if: failure()
         shell: bash
@@ -113,6 +118,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm playwright install ${{ matrix.e2e-browser }}
       - run: pnpm test:cross-platform:${{ matrix.mode }}
+
+      - name: Print flaky test report
+        run: node scripts/print-flaky-test-report.js
+
       - name: Archive test results
         if: failure()
         shell: bash

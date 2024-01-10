@@ -66,7 +66,7 @@ export const test = base.extend({
 			}
 		}
 
-		use(clicknav);
+		await use(clicknav);
 	},
 
 	in_view: async ({ page }, use) => {
@@ -101,18 +101,30 @@ export const test = base.extend({
 		const page_navigation_functions = ['goto', 'goBack', 'reload'];
 		page_navigation_functions.forEach((fn) => {
 			// @ts-expect-error
-			const page_fn = page[fn];
-			if (!page_fn) {
+			const original_page_fn = page[fn];
+			if (!original_page_fn) {
 				throw new Error(`function does not exist on page: ${fn}`);
 			}
+
 			// @ts-expect-error
-			page[fn] = async function (...args) {
-				const res = await page_fn.call(page, ...args);
-				if (javaScriptEnabled && args[1]?.wait_for_started !== false) {
-					await page.waitForSelector('body.started', { timeout: 15000 });
+			async function modified_fn(...args) {
+				try {
+					const res = await original_page_fn.apply(page, args);
+					if (javaScriptEnabled && args[1]?.wait_for_started !== false) {
+						await page.waitForSelector('body.started', { timeout: 15000 });
+					}
+					return res;
+				} catch (e) {
+					// Exclude this function from the stack trace so that it points to the failing test
+					// instead of this file.
+					// @ts-expect-error
+					Error.captureStackTrace(e, modified_fn);
+					throw e;
 				}
-				return res;
-			};
+			}
+
+			// @ts-expect-error
+			page[fn] = modified_fn;
 		});
 
 		await use(page);
