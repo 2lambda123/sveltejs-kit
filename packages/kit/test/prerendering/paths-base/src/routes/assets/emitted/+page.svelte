@@ -1,4 +1,5 @@
 <script>
-    export let data;
+	export let data;
 </script>
+
 <p>{data.asset}</p>

@@ -14,7 +14,7 @@ export default function () {
 		configResolved(resolvedConfig) {
 			config = resolvedConfig;
 		},
-		load(id, options) {
+		load(id) {
 			if (!id.endsWith(ext)) return;
 			if (config.command === 'serve')
 				return `export default "${path.relative(process.cwd(), id).replaceAll(path.sep, '/')}";`;
