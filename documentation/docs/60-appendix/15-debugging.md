@@ -1,8 +1,11 @@
 ---
-title: Breakpoint Debugging
+title: Debugging
 ---
 
-In addition to the [`@debug`](https://svelte.dev/docs/special-tags#debug) tag, you can also debug Svelte and SvelteKit projects using breakpoints within various tools and development environments. This includes both frontend and backend code.
+In addition to the [`@debug`](https://svelte.dev/docs/special-tags#debug) tag
+and [Svelte Inspector](https://github.com/sveltejs/vite-plugin-svelte/blob/8bd5a0022f5dfa8ccedfa30f6f28c6e95c690efb/docs/inspector.md), you can also debug Svelte and SvelteKit projects using breakpoints within
+various tools and development environments. This includes both frontend and
+backend code.
 
 The following guides assume your JavaScript runtime environment is Node.js.
 
@@ -32,7 +35,7 @@ Here's an example `launch.json`:
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"command": "npm start",
+			"command": "npm run dev",
 			"name": "Run npm start",
 			"request": "launch",
 			"type": "node-terminal"
