@@ -1,5 +1,14 @@
 # @sveltejs/adapter-vercel
 
+## 5.3.2
+
+### Patch Changes
+
+- fix: remove `images` from route-level config ([#12280](https://github.com/sveltejs/kit/pull/12280))
+
+- Updated dependencies [[`25acb1d9fce998dccd8050b93cf4142c2b082611`](https://github.com/sveltejs/kit/commit/25acb1d9fce998dccd8050b93cf4142c2b082611), [`0a0e9aa897123ebec50af08e9385b2ca4fc5bb28`](https://github.com/sveltejs/kit/commit/0a0e9aa897123ebec50af08e9385b2ca4fc5bb28)]:
+  - @sveltejs/kit@2.5.11
+
 ## 5.3.1
 
 ### Patch Changes
