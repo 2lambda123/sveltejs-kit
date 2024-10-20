@@ -23,10 +23,10 @@
 		"e2e-test-dep-error": "file:./_test_dependencies/cjs-only",
 		"e2e-test-dep-hooks": "file:./_test_dependencies/cjs-only",
 		"e2e-test-dep-hooks-client": "file:./_test_dependencies/cjs-only",
-		"svelte": "^4.2.10",
+		"svelte": "^4.2.19",
 		"svelte-check": "^3.6.3",
 		"typescript": "^5.3.3",
-		"vite": "^5.2.8"
+		"vite": "^5.2.14"
 	},
 	"type": "module"
 }
